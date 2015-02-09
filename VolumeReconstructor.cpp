@@ -14,7 +14,7 @@ VolumeReconstructor::VolumeReconstructor(QObject *parent) :
     this->positions = vtkSmartPointer<vtkPoints>::New();
     this->directions = vtkSmartPointer<vtkPoints>::New();
     this->pngReader = vtkSmartPointer<vtkPNGReader>::New();
-    this->imageData = vtkSmartPointer<vtkImageData>::New();
+    //this->imageData = vtkSmartPointer<vtkImageData>::New();
     this->accBuffer = vtkSmartPointer<vtkImageData>::New();
 
     this->transformImageToReference = vtkSmartPointer<vtkMatrix4x4>::New();
@@ -53,7 +53,7 @@ int VolumeReconstructor::generateVolume(QString inputTSV)
 
     setOutputExtent();
 
-    for (int i = 0; i < this->images.size(); i++)
+    for (int i = 48; i < 49; i++)
     {
         qDebug() << "Processing image number" << i;
         insertSlice(this->images.at(i));
@@ -68,16 +68,19 @@ void VolumeReconstructor::readPNGImages(QString directory)
     for (int i = 0; i < this->positions->GetNumberOfPoints(); ++i)
     {
         QString fileName = QString("%1/crop%2.png").arg(directory).arg(QString::number(i+1));
+        qDebug() << "Reading" <<fileName;
         QByteArray byteArray = fileName.toUtf8();
         const char* cString = byteArray.constData();
 
         this->pngReader->SetFileName(cString);
         this->pngReader->Update();
 
+        this->imageData = vtkSmartPointer<vtkImageData>::New();
         this->imageData = this->pngReader->GetOutput();
         //this->imageData->SetOrigin(this->positions->GetPoint(i));
 
         this->images.push_back(this->imageData);
+        this->imageData->Delete();
     }
     qDebug() << "Number of Images:" << this->images.size();
 }
@@ -133,9 +136,9 @@ void VolumeReconstructor::setOutputExtent()
     }
 
     double* outputSpacing = this->ReconstructedVolume->GetSpacing();
-    this->outputExtent[1] = int((extent_Ref[1] - extent_Ref[0]) / outputSpacing[0]);
-    this->outputExtent[3] = int((extent_Ref[3] - extent_Ref[2]) / outputSpacing[1]);
-    this->outputExtent[5] = int((extent_Ref[5] - extent_Ref[4]) / outputSpacing[2]);
+    this->outputExtent[1] = 700;//int((extent_Ref[1] - extent_Ref[0]) / outputSpacing[0]);
+    this->outputExtent[3] = 700;//int((extent_Ref[3] - extent_Ref[2]) / outputSpacing[1]);
+    this->outputExtent[5] = 700;//int((extent_Ref[5] - extent_Ref[4]) / outputSpacing[2]);
 
     //this->outData->SetExtent(this->outputExtent);
     //this->outData->SetOrigin(extent_Ref[0], extent_Ref[2], extent_Ref[4]);
@@ -266,8 +269,8 @@ int VolumeReconstructor::insertSlice(vtkImageData *image)
     }
     insertionParams.matrix = newmatrix;
 
-    ImageProcessor *processor = new ImageProcessor();
-    processor->outputSliceTransformation(&insertionParams);
+    qDebug() << "Image Scalar Type" << image->GetScalarTypeAsString();
+    outputSliceTransformation<double, unsigned char>(&insertionParams);
 }
 
 void VolumeReconstructor::saveOutputVolume()

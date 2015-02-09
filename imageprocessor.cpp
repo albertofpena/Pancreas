@@ -1,6 +1,6 @@
 #include "imageprocessor.h"
 
-ImageProcessor::ImageProcessor(QObject *parent) :
+/*ImageProcessor::ImageProcessor(QObject *parent) :
     QObject(parent)
 {
     this->point[3] = 0;
@@ -114,3 +114,4 @@ int ImageProcessor::nearestNeighborInterpolation(int numscalars,
     //qDebug() << "No hit";
     return 0;
 }
+*/

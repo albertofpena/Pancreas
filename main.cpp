@@ -9,5 +9,7 @@ int main(int argc, char** argv)
     QStringList params = app.arguments();
     VolumeReconstructor volumereconstructor;
     volumereconstructor.generateVolume(params.at(1));
-    return app.exec();
+
+    //return app.exec();
+    app.exit();
 }
