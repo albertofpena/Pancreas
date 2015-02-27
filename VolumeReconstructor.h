@@ -11,9 +11,16 @@
 #include <vtkInformation.h>
 #include <vtkTransform.h>
 #include <Parser.h>
+#include "insertslice.h"
+#include "imageprocessor.h"
+
+#include <vtkImageReslice.h>
+#include <vtkImageTranslateExtent.h>
+#include <vtkProp3D.h>
+
 #include <vtkImageExtractComponents.h>
 #include <vtkMetaImageWriter.h>
-#include "imageprocessor.h"
+
 
 class VolumeReconstructor : public QObject
 {
@@ -23,8 +30,6 @@ public:
     explicit VolumeReconstructor(QObject *parent = 0);
 
 private:
-    double outputOrigin[3];
-    double outputSpacing[3];
     int outputExtent[6] = { 0, 0, 0, 0, 0, 0 };
     vtkImageData *ReconstructedVolume;
     vtkSmartPointer<vtkPoints> positions;
@@ -32,14 +37,10 @@ private:
     vtkSmartPointer<vtkPNGReader> pngReader;
     vtkSmartPointer<vtkImageData> imageData;
     //vtkSmartPointer<vtkImageData> outData;
-    vtkSmartPointer<vtkImageData> accBuffer;
     vtkSmartPointer<vtkMatrix4x4> transformImageToReference;
-    vtkSmartPointer<vtkTransform> tVolumePixFromRef;
-    vtkSmartPointer<vtkTransform> tRefFromImage;
-    vtkSmartPointer<vtkTransform> tImageFromImagePix;
-    vtkSmartPointer<vtkTransform> tImagePixToVolumePix;
-    vtkSmartPointer<vtkMatrix4x4> mImagePixToVolumePix;
-    std::vector< vtkSmartPointer<vtkImageData> > images;
+
+    InsertSlice *sliceAdder;
+//    std::vector< vtkSmartPointer<vtkImageData> > images;
 
     //ImageProcessor *processor;
 
@@ -47,10 +48,8 @@ private:
 
 public slots:
     int generateVolume(QString inputTSV);
-    void readPNGImages(QString directory);
+    vtkImageData* readPNGImages(QString directory, int index);
     void setOutputExtent();
-    int insertSlice(vtkImageData *image);
-    int resetOutput();
 };
 
 #endif // VolumeReconstructor_H

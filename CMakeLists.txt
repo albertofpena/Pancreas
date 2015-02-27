@@ -10,7 +10,7 @@ include(${VTK_USE_FILE})
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOMOC ON)
 
-set(VolumeReconstructor_SRCS VolumeReconstructor.cpp main.cpp Parser.cpp imageprocessor.cpp)
+set(VolumeReconstructor_SRCS VolumeReconstructor.cpp main.cpp Parser.cpp imageprocessor.cpp insertslice.cpp)
 
 add_executable(volumereconstructor ${VolumeReconstructor_SRCS})
 target_link_libraries(volumereconstructor ${QT_QTCORE_LIBRARY})

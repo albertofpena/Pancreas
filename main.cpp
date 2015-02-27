@@ -10,6 +10,7 @@ int main(int argc, char** argv)
     VolumeReconstructor volumereconstructor;
     volumereconstructor.generateVolume(params.at(1));
 
+    qDebug() << "Cerrando el programa";
     //return app.exec();
     app.exit();
 }

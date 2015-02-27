@@ -1,0 +1,2 @@
+/home/alberto/projects/VolumeReconstructor/build/CMakeFiles/volumereconstructor.dir
+/home/alberto/projects/VolumeReconstructor/build/CMakeFiles/volumereconstructor_automoc.dir
