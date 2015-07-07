@@ -1,13 +1,9 @@
 #ifndef IMAGEPROCESSOR_H
 #define IMAGEPROCESSOR_H
 
-#include <QObject>
 #include <vtkImageData.h>
 #include <vtkIdTypeArray.h>
 #include <QDebug>
-
-#include <QFile>
-#include <QTextStream>
 
 #define ACCUMULATION_MULTIPLIER 256
 #define ACCUMULATION_MAXIMUM 65535
@@ -27,6 +23,14 @@ struct vtkPasteSliceIntoVolumeInsertSliceParams
     // transform matrix for images -> volume
     void* matrix;
 };
+
+template <class F>
+static inline int Floor(F x, F &f)
+{
+    int ix = floor(x);
+    f = x - ix;
+    return ix;
+}
 
 template <class F, class T>
 static int nearestNeighborInterpolation(F *point,
@@ -103,12 +107,152 @@ static int nearestNeighborInterpolation(F *point,
 }
 
 template <class F, class T>
+static int trilinearInterpolation(F *point,
+                                  T *inPtr,
+                                  T *outPtr,
+                                  unsigned short *accPtr,
+                                  int numscalars,
+                                  int outExt[6],
+                                  vtkIdType outInc[3],
+                                  unsigned int* accOverflowCount)
+{
+    // Determine if the output is a floating point or integer type. If floating point type then we don't round
+    // the interpolated value.
+    bool roundOutput=true; // assume integer output by default
+    T floatValueInOutputType=0.3;
+    if (floatValueInOutputType>0)
+    {
+        // output is a floating point number
+        roundOutput=false;
+    }
+
+    F fx, fy, fz;
+
+    // convert point[0] into integer component and a fraction
+    int outIdX0 = Floor(point[0], fx);
+    // point[0] is unchanged, outIdX0 is the integer (floor), fx is the float
+    int outIdY0 = Floor(point[1], fy);
+    int outIdZ0 = Floor(point[2], fz);
+
+    int outIdX1 = outIdX0 + (fx != 0); // ceiling
+    int outIdY1 = outIdY0 + (fy != 0);
+    int outIdZ1 = outIdZ0 + (fz != 0);
+
+    // at this point in time we have the floor (outIdX0), the ceiling (outIdX1)
+    // and the fractional component (fx) for x, y and z
+
+    // bounds check
+    if ((outIdX0 | (outExt[1]-outExt[0] - outIdX1) |
+         outIdY0 | (outExt[3]-outExt[2] - outIdY1) |
+         outIdZ0 | (outExt[5]-outExt[4] - outIdZ1)) >= 0)
+    {
+        // do reverse trilinear interpolation
+        int factX0 = outIdX0*outInc[0];
+        int factY0 = outIdY0*outInc[1];
+        int factZ0 = outIdZ0*outInc[2];
+        int factX1 = outIdX1*outInc[0];
+        int factY1 = outIdY1*outInc[1];
+        int factZ1 = outIdZ1*outInc[2];
+
+        int factY0Z0 = factY0 + factZ0;
+        int factY0Z1 = factY0 + factZ1;
+        int factY1Z0 = factY1 + factZ0;
+        int factY1Z1 = factY1 + factZ1;
+
+        // increment between the output pointer and the 8 pixels to work on
+        int idx[8];
+        idx[0] = factX0 + factY0Z0;
+        idx[1] = factX0 + factY0Z1;
+        idx[2] = factX0 + factY1Z0;
+        idx[3] = factX0 + factY1Z1;
+        idx[4] = factX1 + factY0Z0;
+        idx[5] = factX1 + factY0Z1;
+        idx[6] = factX1 + factY1Z0;
+        idx[7] = factX1 + factY1Z1;
+
+        // remainders from the fractional components - difference between the fractional value and the ceiling
+        F rx = 1 - fx;
+        F ry = 1 - fy;
+        F rz = 1 - fz;
+
+        F ryrz = ry*rz;
+        F ryfz = ry*fz;
+        F fyrz = fy*rz;
+        F fyfz = fy*fz;
+
+        F fdx[8]; // fdx is the weight towards the corner
+        fdx[0] = rx*ryrz;
+        fdx[1] = rx*ryfz;
+        fdx[2] = rx*fyrz;
+        fdx[3] = rx*fyfz;
+        fdx[4] = fx*ryrz;
+        fdx[5] = fx*ryfz;
+        fdx[6] = fx*fyrz;
+        fdx[7] = fx*fyfz;
+
+        F f, r, a;
+        T *inPtrTmp, *outPtrTmp;
+
+        unsigned short *accPtrTmp;
+
+        // loop over the eight voxels
+        int j = 8;
+        do
+        {
+            j--;
+            if (fdx[j] == 0)
+            {
+                continue;
+            }
+            inPtrTmp = inPtr;
+            outPtrTmp = outPtr+idx[j];
+            accPtrTmp = accPtr+ ((idx[j]/outInc[0])); // removed cast to unsigned short - prevented larger increments in Z direction
+            a = *accPtrTmp;
+
+            int i = numscalars;
+            do
+            {
+                i--;
+                f = fdx[j];
+                r = F((*accPtrTmp)/(double)ACCUMULATION_MULTIPLIER);  // added division by double, since this always returned 0 otherwise
+                a = f + r;
+                if (roundOutput)
+                {
+                    *outPtrTmp = round((f*(*inPtrTmp) + r*(*outPtrTmp))/a);
+                }
+                else
+                {
+                    *outPtrTmp = (f*(*inPtrTmp) + r*(*outPtrTmp))/a;
+                }
+                a *= ACCUMULATION_MULTIPLIER; // needs to be done for proper conversion to unsigned short for accumulation buffer
+            }
+            while(i);
+
+            F newa = a;
+            if (newa > ACCUMULATION_THRESHOLD && *accPtrTmp <= ACCUMULATION_THRESHOLD)
+                (*accOverflowCount) += 1;
+            // don't allow accumulation buffer overflow
+            *accPtrTmp = ACCUMULATION_MAXIMUM;
+            if (newa < ACCUMULATION_MAXIMUM)
+            {
+                // round the fixed point to the nearest whole unit, and save the result as an unsigned short into the accumulation buffer
+                *accPtrTmp = round(newa);
+            }
+        }
+        while (j);
+        return 1;
+    }
+    // if bounds check fails
+    return 0;
+}
+
+template <class F, class T>
 static void outputSliceTransformation(vtkPasteSliceIntoVolumeInsertSliceParams *insertionParams)
 {
-    //QFile file("out.m");
-    //file.open(QIODevice::WriteOnly | QIODevice::Text);
-    //QTextStream out(&file);
-    //out << "A = [" << endl;
+//    QFile file("out.m");
+//    file.open(QIODevice::WriteOnly | QIODevice::Text);
+//    QTextStream out(&file);
+//    out << "A = [" << endl;
 
 
     int hit = 0;
@@ -122,11 +266,11 @@ static void outputSliceTransformation(vtkPasteSliceIntoVolumeInsertSliceParams *
     unsigned int *accOverflowCount = insertionParams->accOverflowCount;
 
     F *matrix = reinterpret_cast<F*>(insertionParams->matrix);
-    qDebug() << "imageprocessor.h" << __LINE__ << "matrix:" << matrix[0]<<" "<<matrix[1]<<" "<<matrix[2]<<" "<<matrix[3]<<"; "
-             <<matrix[4]<<" "<<matrix[5]<<" "<<matrix[6]<<" "<<matrix[7]<<"; "
-             <<matrix[8]<<" "<<matrix[9]<<" "<<matrix[10]<<" "<<matrix[11]<<"; "
-             <<matrix[12]<<" "<<matrix[13]<<" "<<matrix[14]<<" "<<matrix[15];
-    qDebug() << "imageprocessor.h" << __LINE__ << "Extent:" << inExt[0]<< inExt[1] << inExt[2] << inExt[3] << inExt[4] << inExt[5];
+//    qDebug() << "imageprocessor.h" << __LINE__ << "matrix:" << matrix[0]<<" "<<matrix[1]<<" "<<matrix[2]<<" "<<matrix[3]<<"; "
+//             <<matrix[4]<<" "<<matrix[5]<<" "<<matrix[6]<<" "<<matrix[7]<<"; "
+//             <<matrix[8]<<" "<<matrix[9]<<" "<<matrix[10]<<" "<<matrix[11]<<"; "
+//             <<matrix[12]<<" "<<matrix[13]<<" "<<matrix[14]<<" "<<matrix[15];
+//    qDebug() << "imageprocessor.h" << __LINE__ << "Extent:" << inExt[0]<< inExt[1] << inExt[2] << inExt[3] << inExt[4] << inExt[5];
 
     double inSpacing[3];
     inData->GetSpacing(inSpacing);
@@ -169,15 +313,16 @@ static void outputSliceTransformation(vtkPasteSliceIntoVolumeInsertSliceParams *
                 point[2] /= point[3];
                 point[3] = 1;
 
-                //out << point[0] << " " << point [1]<< " " << point[2] << endl;
+//                out << point[0] << " " << point [1]<< " " << point[2] << endl;
                 hit += nearestNeighborInterpolation<double, T>(point, inPtr, outPtr, accPtr, numscalars, outExt, outInc, accOverflowCount);
+              //  hit += trilinearInterpolation<double, T>(point, inPtr, outPtr, accPtr, numscalars, outExt, outInc, accOverflowCount);
 
             }
         } 
     }
 
-    //out << "];\nB = transpose(A);\nscatter3(B(1,:),B(2,:),B(3,:))";
-    //file.close();
+//    out << "];\nB = transpose(A);\nscatter3(B(1,:),B(2,:),B(3,:))";
+//    file.close();
     qDebug() << "hit" << hit;
 }
 

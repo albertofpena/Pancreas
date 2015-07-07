@@ -37,13 +37,16 @@ private:
     vtkSmartPointer<vtkPNGReader> pngReader;
     vtkSmartPointer<vtkImageData> imageData;
     //vtkSmartPointer<vtkImageData> outData;
+    vtkSmartPointer<vtkMatrix4x4> translateAndRotate;
     vtkSmartPointer<vtkMatrix4x4> transformImageToReference;
+    vtkSmartPointer<vtkMatrix4x4> finalTransform;
 
     InsertSlice *sliceAdder;
 //    std::vector< vtkSmartPointer<vtkImageData> > images;
 
     //ImageProcessor *processor;
 
+    void recalculateExtent();
     void saveOutputVolume();
 
 public slots:

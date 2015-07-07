@@ -84,7 +84,7 @@ int InsertSlice::pasteSlice(vtkImageData *image, vtkMatrix4x4 *transformation)
     }
     insertionParams.matrix = newmatrix;
 
-    qDebug() << "Image Scalar Type" << image->GetScalarTypeAsString();
+//    qDebug() << "Image Scalar Type" << image->GetScalarTypeAsString();
     outputSliceTransformation<double, unsigned char>(&insertionParams);
 }
 

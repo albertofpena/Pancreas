@@ -47,37 +47,37 @@ void Parser::parseTSVFile(QString inputFile, vtkPoints* positions, vtkPoints* di
             //std::replace(str.begin(),str.end(),',','.');
             double w = atof(str.c_str());
 
-            if (this->i == 5)
+            if (this->i == 17)
             {
                 // Reading Rz
                 //std::cout << "<" << w << "> ";
                 this->rz = w;
             }
-            if (this->i == 6)
+            if (this->i == 18)
             {
                 // Reading Ry
                 //std::cout << "<" << w << "> ";
                 this->ry = w;
             }
-            if (this->i == 7)
+            if (this->i == 19)
             {
                 // Reading Rz
                 //std::cout << "<" << w << "> ";
                 this->rx = w;
             }
-            if (this->i == 8)
+            if (this->i == 20)
             {
                 // Reading Tx
                 //std::cout << "<" << w << "> ";
                 this->tx = w;
             }
-            if (this->i == 9)
+            if (this->i == 21)
             {
                 // Reading Ty
                 //std::cout << "<" << w << "> ";
                 this->ty = w;
             }
-            if (this->i == 10)
+            if (this->i == 22)
             {
                 // Reading Tz
                 //std::cout << "<" << w << "> ";
@@ -89,9 +89,9 @@ void Parser::parseTSVFile(QString inputFile, vtkPoints* positions, vtkPoints* di
         double angle[3] = {this->rx, this->ry, this->rz};
 
         positions->InsertNextPoint(point);
-        qDebug() << "positions" << point[0] << point[1] << point[2];
+//        qDebug() << "positions" << point[0] << point[1] << point[2];
         directions->InsertNextPoint(angle);
-        qDebug() << "directions" << angle[0] << angle[1] << angle[2];
+//        qDebug() << "directions" << angle[0] << angle[1] << angle[2];
         //std::cout << "\n";
         this->i = 0;
     }
